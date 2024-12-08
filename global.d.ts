@@ -1,0 +1,1 @@
+declare module '@regulaforensics/react-native-face-core-match'
