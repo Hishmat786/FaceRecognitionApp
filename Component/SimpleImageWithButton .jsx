@@ -60,10 +60,11 @@ const CameraComponent = () => {
     const copyFileToDocumentDirectory = async () => {
         try {
             const targetPath = `${RNFS.DocumentDirectoryPath}/hishmat.jpeg`;
-            const assetPath = 'assets/images/hishmat.jpeg'; // Relative path inside the assets folder
+            const assetPath = '../assests/images/hishmat.jpeg'; // Relative path inside the assets folder
             console.log("Asset Path:", assetPath, "Target Path:", targetPath);
             // Check if the file already exists
-            const fileExists = await RNFS.exists(assetPath);
+            console.log(RNFS.DocumentDirectoryPath);
+            const fileExists = await RNFS.exists(targetPath);
             console.log("File already exists:", fileExists);
     
             if (!fileExists) {
