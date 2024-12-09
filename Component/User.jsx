@@ -9,7 +9,9 @@ import {
 } from 'react-native';
 import { Camera, useCameraDevices } from 'react-native-vision-camera';
 import RNFS from 'react-native-fs';
-import { FaceCore } from '@regulaforensics/react-native-face-core-match';
+import FaceSDK, { MatchFacesImage, MatchFacesRequest, MatchFacesResponse, ImageType } from '@regulaforensics/react-native-face-api';
+import * as Regula from '@regulaforensics/react-native-face-core-match';
+// import { FaceSDK } from '@regulaforensics/react-native-face-api';
 
 const EmployeeDataComponent = () => {
     const [employeeData, setEmployeeData] = useState(null);
@@ -21,7 +23,9 @@ const EmployeeDataComponent = () => {
     const devices = useCameraDevices();
     const device = devices[1]; // Use the front camera
 
+
     useEffect(() => {
+        // console.log('Facesdk', FaceSDK)
         const fetchEmployeeData = async () => {
             const userId = 'SUK220030'; // Hardcoded user ID
             const adminName = 'ayaz'; // Hardcoded admin name
@@ -32,7 +36,7 @@ const EmployeeDataComponent = () => {
             }).toString();
 
             try {
-                const response = await fetch(`http://10.102.138.178:3000/api/get-employee/?${query}`);
+                const response = await fetch(`http://10.102.138.75:3000/api/get-employee/?${query}`);
                 if (!response.ok) {
                     throw new Error('Failed to fetch employee data');
                 }
@@ -41,18 +45,17 @@ const EmployeeDataComponent = () => {
 
                 // Download and load reference image as Base64
                 if (data.imageUrl) {
-                    const remoteImageUrl = `http://10.102.138.178:3000${data.imageUrl}`;
+                    const remoteImageUrl = `http://10.102.138.75:3000${data.imageUrl}`;
                     const localFilePath = `${RNFS.DocumentDirectoryPath}/referenceImage.jpg`;
 
-                    // Download the image
                     const downloadResult = await RNFS.downloadFile({
                         fromUrl: remoteImageUrl,
                         toFile: localFilePath,
                     }).promise;
 
                     if (downloadResult.statusCode === 200) {
+
                         const base64 = await RNFS.readFile(localFilePath, 'base64');
-                        // console.log('Reference Image Base64:', base64);
                         setReferenceImageBase64(base64);
                     } else {
                         throw new Error('Failed to download reference image');
@@ -79,6 +82,7 @@ const EmployeeDataComponent = () => {
 
                 // Convert captured image to Base64
                 const capturedBase64 = await RNFS.readFile(photo.path, 'base64');
+                console.log("going to face recog")
                 performFaceRecognition(capturedBase64);
 
                 setIsCameraOpen(false);
@@ -90,26 +94,116 @@ const EmployeeDataComponent = () => {
         }
     };
 
+    // const performFaceRecognition = async (capturedBase64) => {
+    //     console.log("inside recognitioon")
+    //     if (!referenceImageBase64) {
+    //         Alert.alert('Error', 'No reference image available for recognition.');
+    //         return;
+    //     }
+    //     console.log("image matching")
+
+    //     const firstImage = new MatchFacesImage();
+    //     console.log("firstImage",firstImage)
+    //     firstImage.imageType = ImageType.IMAGE_TYPE_PRINTED;
+    //     firstImage.bitmap = referenceImageBase64;
+    //     // console.log("firstImage",firstImage)
+    //     const secondImage = new MatchFacesImage();
+    //     secondImage.imageType = ImageType.IMAGE_TYPE_PRINTED;
+    //     secondImage.bitmap = capturedBase64;
+    //     console.log("secondImage",secondImage)
+    //     const request = new MatchFacesRequest();
+    //     console.log("request",request)
+    //     request.images = [firstImage, secondImage];
+
+    //     FaceSDK.matchFaces(JSON.stringify(request), matchFacesResponse => {
+    //         const response = MatchFacesResponse.fromJson(JSON.parse(matchFacesResponse));
+    //         // ... check response.results for results with score and similarity values.
+    //     }, e => { console.log("error",e)});
+
+    //     console.log("processing recognition")
+    //     // try {
+    //     //     const images = [
+    //     //         { image: referenceImageBase64, type: 1 }, // Type 1 for Printed (check documentation for exact value)
+    //     //         { image: capturedBase64, type: 0 }, // Type 0 for Live
+    //     //     ];
+
+    //     //     const matchResponse = await FaceSDK.matchFaces({ images });
+
+    //     //     console.log("matchResponse: ", matchResponse);
+    //     //     const processedResponse = await FaceSDK.splitComparedFaces(matchResponse.results, 0.8); // Use a threshold
+
+    //     //     if (processedResponse.matchedFaces.length > 0) {
+    //     //         Alert.alert('Match Found', 'The captured face matches the reference image.');
+    //     //     } else {
+    //     //         Alert.alert('No Match', 'The captured face does not match the reference image.');
+    //     //     }
+    //     // } catch (error) {
+    //     //     console.error('Error in face recognition:', error);
+    //     //     Alert.alert('Error', 'Failed to perform face recognition.');
+    //     // }
+    // };
+
+
     const performFaceRecognition = async (capturedBase64) => {
         try {
+            console.log('Starting face recognition process');
+
+            // Check if reference image exists
             if (!referenceImageBase64) {
                 Alert.alert('Error', 'No reference image available for recognition.');
                 return;
             }
-            console.log("Loading images")
-            const matchResponse = await FaceCore.matchFaces({
-                image1: { imageBase64: referenceImageBase64 },
-                image2: { imageBase64: capturedBase64 },
-            });
 
-            console.log("Match Response:", matchResponse);
-            if (matchResponse.result && matchResponse.result[0].similarity > 0.8) {
-                Alert.alert('Match Found', 'The captured face matches the reference image.');
-            } else {
-                Alert.alert('No Match', 'The captured face does not match the reference image.');
-            }
+            // Create the first MatchFacesImage object for the reference image
+            const firstImage = new MatchFacesImage();
+            firstImage.imageType = ImageType.IMAGE_TYPE_PRINTED; // Type of the reference image
+            firstImage.bitmap = referenceImageBase64;
+
+            // Create the second MatchFacesImage object for the captured image
+            const secondImage = new MatchFacesImage();
+            secondImage.imageType = ImageType.IMAGE_TYPE_LIVE; // Type of the captured image
+            secondImage.bitmap = capturedBase64;
+
+            console.log('First and second MatchFacesImage objects created');
+
+            // Create the MatchFacesRequest object with the images
+            const request = new MatchFacesRequest();
+            request.images = [firstImage, secondImage];
+
+            // console.log('MatchFacesRequest created:', JSON.stringify(request));
+
+            console.log("Perform face r")
+            FaceSDK.matchFaces(
+                JSON.stringify(request), // First argument: Serialized request
+                (matchFacesResponse) => { // Second argument: Success callback
+                    console.log('MatchFacesResponse:', matchFacesResponse);
+
+                    // Parse the response
+                    const response = MatchFacesResponse.fromJson(JSON.parse(matchFacesResponse));
+
+                    // Check the response results for similarity scores
+                    if (response.results && response.results.length > 0) {
+                        const [result] = response.results;
+                        const similarityPercentage = (result.similarity * 100).toFixed(2);
+                        if (result.similarity > 0.8) {
+                            Alert.alert('Match Found', `Similarity: ${similarityPercentage}%`);
+                        } else {
+                            Alert.alert('No Match', `Similarity: ${similarityPercentage}%`);
+                        }
+                    } else {
+                        Alert.alert('Error', 'No matching results found.');
+                    }
+                },
+                (error) => { // Third argument: Error callback
+                    console.error('Error in matchFaces:', error);
+                    Alert.alert('Error', 'Failed to perform face matching.');
+                },
+                null // Fourth argument: Additional options (nullable or optional)
+            );
+
+            console.log('Face recognition process completed');
         } catch (error) {
-            console.error('Error in face recognition:', error);
+            console.error('Error in performFaceRecognition:', error);
             Alert.alert('Error', 'Failed to perform face recognition.');
         }
     };
